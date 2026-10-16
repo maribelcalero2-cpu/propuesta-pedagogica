@@ -6331,303 +6331,688 @@ try {
 // ── Generador de PDF (jsPDF, Times New Roman 12pt, sin comprimir) ─────────
 function generarPDF() {
   var btn = document.getElementById('btn-pdf');
-  if (btn) { btn.textContent = '⏳ Generando…'; btn.disabled = true; }
+  if (btn) { btn.textContent = '⏳ Generando...'; btn.disabled = true; }
 
-  // Cargar jsPDF dinámicamente si no está disponible
-  function cargarJsPDF(cb) {
-    if (window.jspdf) { cb(); return; }
+  // Carga secuencial: primero jsPDF, luego autoTable
+  function cargarSecuencial(urls, idx, cb) {
+    if (idx >= urls.length) { cb(); return; }
     var s = document.createElement('script');
-    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
-    s.onload = cb;
+    s.src = urls[idx];
+    s.onload = function() { cargarSecuencial(urls, idx + 1, cb); };
+    s.onerror = function() { cargarSecuencial(urls, idx + 1, cb); };
     document.head.appendChild(s);
   }
 
-  cargarJsPDF(function() {
+  var libs = [];
+  if (!window.jspdf) {
+    libs.push('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js');
+  }
+  if (!(window.jspdf && window.jspdf.jsPDF && typeof window.jspdf.jsPDF.prototype.autoTable === 'function')) {
+    libs.push('https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js');
+  }
+
+  cargarSecuencial(libs, 0, function() {
     try {
       var jsPDF = window.jspdf.jsPDF;
-      var doc = new jsPDF({
-        orientation: 'portrait',
-        unit: 'pt',
-        format: 'a4',
-        compress: false
-      });
+      var doc = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'a4' });
 
-      var PAGE_W  = 595.28;
-      var PAGE_H  = 841.89;
-      var ML      = 70;   // margen izquierdo
-      var MR      = 70;   // margen derecho
-      var MT      = 70;   // margen superior
-      var MB      = 70;   // margen inferior
-      var CW      = PAGE_W - ML - MR;  // ancho útil
-      var LH12    = 16;   // interlineado 12pt
-      var LH_H1   = 22;
-      var LH_H2   = 18;
-      var y       = MT;
+      // ── Constantes de layout ──────────────────────────────────────
+      var PW = 595.28, PH = 841.89;
+      var ML = 50, MR = 50, MT = 50, MB = 55;
+      var CW = PW - ML - MR;
+      var LH = 14;
 
-      // ── helpers ─────────────────────────────────────────────────────────
-      function newPage() {
-        doc.addPage();
-        y = MT;
-        // pie de página
-        doc.setFont('times','normal'); doc.setFontSize(9);
-        doc.setTextColor(120,120,120);
-        doc.text('Programación Didáctica Anual · EI Andalucía 2026-27', ML, PAGE_H - 30);
-        doc.text(String(doc.internal.getCurrentPageInfo().pageNumber), PAGE_W - MR, PAGE_H - 30, {align:'right'});
-        doc.setTextColor(0,0,0);
-      }
+      // ── Hilo activo ───────────────────────────────────────────────
+      var hiloSel = document.getElementById('sel-hilo');
+      var hiloId  = (hiloSel ? hiloSel.value : 'milo') || 'milo';
+      var HNOM = { milo:'MILO', gaia:'GAIA', lua:'LUA', nuno:'NUNO', ora:'ORA' };
+      var HCOL = {
+        milo: [30,136,229], gaia: [45,106,79],
+        lua:  [23,162,184], nuno: [140,100,80], ora: [220,130,0]
+      };
+      var hiloNom = HNOM[hiloId] || 'MILO';
+      var HC      = HCOL[hiloId] || [30,136,229];
 
-      function checkY(needed) {
-        if (y + needed > PAGE_H - MB) { newPage(); }
-      }
-
-      function addH1(txt) {
-        checkY(LH_H1 + 10);
-        y += 6;
-        doc.setFont('times','bold'); doc.setFontSize(16);
-        var lines = doc.splitTextToSize(txt, CW);
-        doc.text(lines, ML, y);
-        y += lines.length * LH_H1 + 6;
-        // línea decorativa
-        doc.setDrawColor(20,100,200); doc.setLineWidth(1);
-        doc.line(ML, y, ML + CW, y);
-        y += 8;
-        doc.setFont('times','normal'); doc.setFontSize(12); doc.setDrawColor(0,0,0);
-      }
-
-      function addH2(txt) {
-        checkY(LH_H2 + 8);
-        y += 6;
-        doc.setFont('times','bold'); doc.setFontSize(13);
-        var lines = doc.splitTextToSize(txt, CW);
-        doc.text(lines, ML, y);
-        y += lines.length * LH_H2 + 4;
-        doc.setFont('times','normal'); doc.setFontSize(12);
-      }
-
-      function addH3(txt) {
-        checkY(LH12 + 6);
-        y += 4;
-        doc.setFont('times','bolditalic'); doc.setFontSize(12);
-        var lines = doc.splitTextToSize(txt, CW);
-        doc.text(lines, ML, y);
-        y += lines.length * LH12 + 3;
-        doc.setFont('times','normal'); doc.setFontSize(12);
-      }
-
-      function addPara(txt) {
-        if (!txt || !txt.trim()) return;
-        txt = cleanText(txt);
-        if (!txt) return;
-        var lines = doc.splitTextToSize(txt, CW);
-        checkY(lines.length * LH12);
-        doc.setFont('times','normal'); doc.setFontSize(12);
-        doc.text(lines, ML, y);
-        y += lines.length * LH12 + 4;
-      }
-
-      function addLabelValue(label, value) {
-        if (!value || !value.trim()) return;
-        label = cleanText(label) || label;
-        value = cleanText(value);
-        if (!value) return;
-        var full = label + ': ' + value;
-        var lines = doc.splitTextToSize(full, CW);
-        checkY(lines.length * LH12);
-        // label en negrita, valor en normal — primer segmento
-        doc.setFont('times','bold'); doc.setFontSize(12);
-        var lw = doc.getTextWidth(label + ': ');
-        doc.text(label + ': ', ML, y);
-        doc.setFont('times','normal');
-        // resto de la primera línea
-        var rest = value;
-        var restLines = doc.splitTextToSize(rest, CW - lw);
-        doc.text(restLines[0], ML + lw, y);
-        y += LH12;
-        for (var ri = 1; ri < restLines.length; ri++) {
-          checkY(LH12);
-          doc.text(restLines[ri], ML + 20, y);
-          y += LH12;
-        }
-        y += 2;
-      }
-
-      function addSep() {
-        checkY(16);
-        y += 6;
-        doc.setDrawColor(200,200,200); doc.setLineWidth(0.5);
-        doc.line(ML, y, ML + CW, y);
-        y += 6;
-        doc.setDrawColor(0,0,0);
-      }
-
-      function textOf(sel, root) {
-        root = root || document;
-        var el = typeof sel === 'string' ? root.querySelector(sel) : sel;
-        return el ? el.textContent.trim() : '';
-      }
-
-      function textsOf(sel, root) {
-        root = root || document;
-        var out = [];
-        root.querySelectorAll(sel).forEach(function(el) { out.push(el.textContent.trim()); });
-        return out;
-      }
-
-      // Elimina emoji/símbolos que jsPDF Times Roman no puede renderizar
-      // y sustituye el nombre de MILO por el del personaje del hilo activo
-      function cleanText(s) {
-        if (!s) return '';
-        // Sustituir MILO por el personaje activo (la variable hiloActivoId se asigna antes de que se llame a esta función)
-        var _hiloNom = {milo:'MILO',gaia:'GAIA',lua:'LUA',nuno:'NUNO',ora:'ORA'};
-        var _nomAct = _hiloNom[hiloActivoId] || 'MILO';
-        if (_nomAct !== 'MILO') s = s.replace(/MILO/g, _nomAct);
-        // Conservar: ASCII básico + Latín con tilde (español) + rayas y comillas tipográficas
-        // Eliminar: emoji, CJK, cirílico y cualquier cosa fuera de ese rango
-        return s.replace(/[^ -ÿĀ-ɏ–—‘’“”«»]/g, '')
-                .replace(/\s+/g, ' ').trim();
-      }
-
-      // ── PORTADA ──────────────────────────────────────────────────────────
-      doc.setFont('times','bold'); doc.setFontSize(22);
-      var tit = textOf('.main-title') || 'Programación Didáctica Anual';
-      doc.text(tit, PAGE_W / 2, 200, {align:'center'});
-
-      doc.setFont('times','normal'); doc.setFontSize(14);
-      var sub = textOf('#header-sub') || '2º ciclo EI · Andalucía 2026-27';
-      doc.text(sub, PAGE_W / 2, 230, {align:'center'});
-
-      doc.setFont('times','italic'); doc.setFontSize(12);
-      doc.text('Educación Infantil · 2º Ciclo · Andalucía', PAGE_W / 2, 260, {align:'center'});
-
-      // Datos del contexto
-      doc.setFont('times','normal'); doc.setFontSize(12);
-      var centro  = (document.getElementById('inp-centro') || {}).value || '';
+      // ── Contexto del aula ─────────────────────────────────────────
+      var nivelEl = document.getElementById('sel-nivel');
+      var nivelTx = nivelEl ? nivelEl.options[nivelEl.selectedIndex].text : '5 anos';
+      var nivelVl = nivelEl ? nivelEl.value : '5a';
+      var centroEl = document.getElementById('inp-centro');
+      var centro  = centroEl ? centroEl.value.trim() : '';
       var tipoEl  = document.getElementById('sel-tipo-centro');
       var tipoCt  = tipoEl ? tipoEl.options[tipoEl.selectedIndex].text : '';
-      var nivelEl = document.getElementById('sel-nivel');
-      var nivelTx = nivelEl ? nivelEl.options[nivelEl.selectedIndex].text : '';
       var nalEl   = document.getElementById('inp-nalumnos');
-      var nal     = nalEl ? nalEl.value : '';
-      if (centro)  { doc.text('Centro: ' + centro,  PAGE_W/2, 300, {align:'center'}); }
-      if (nivelTx) { doc.text('Nivel: ' + nivelTx,  PAGE_W/2, 318, {align:'center'}); }
-      if (tipoCt)  { doc.text('Tipo: ' + tipoCt,    PAGE_W/2, 336, {align:'center'}); }
-      if (nal)     { doc.text('Nº alumnos: ' + nal, PAGE_W/2, 354, {align:'center'}); }
+      var nal     = nalEl ? nalEl.value.trim() : '';
 
-      // Imagen del personaje en portada PDF
-      var hiloActivoId = (function() {
-        var tipo = document.getElementById('sel-tipo');
-        var hiloSel = document.getElementById('sel-hilo');
-        return hiloSel ? hiloSel.value : '';
-      })();
-      if (hiloActivoId && PERSONAJES_IMG[hiloActivoId]) {
-        try {
-          var imgData = PERSONAJES_IMG[hiloActivoId];
-          var imgH = 130;
-          var imgW = 100;
-          doc.addImage(imgData, 'PNG', PAGE_W/2 - imgW/2, 370, imgW, imgH);
-        } catch(imgErr) { /* imagen no disponible */ }
+      // ── limpiar(): char-a-char, sin emoji ni simbolos ─────────────
+      function limpiar(s) {
+        if (!s) return '';
+        s = String(s);
+        // reemplazar nombre mascota si no es MILO
+        if (hiloNom !== 'MILO') s = s.split('MILO').join(hiloNom);
+        var out = '';
+        for (var i = 0; i < s.length; i++) {
+          var c = s.charCodeAt(i);
+          // par surrogate (emoji UTF-16) -> saltar ambas unidades
+          if (c >= 0xD800 && c <= 0xDBFF) { i++; continue; }
+          if (c >= 0xDC00 && c <= 0xDFFF) { continue; }
+          // ASCII imprimible
+          if (c >= 32 && c <= 126) { out += s[i]; continue; }
+          // Latin-1 Supplement y Latin Extended-A/B
+          if (c >= 160 && c <= 591) { out += s[i]; continue; }
+          // Guiones tipograficos -> guion
+          if (c === 8211 || c === 8212) { out += '-'; continue; }
+          // Comillas tipograficas -> ASCII
+          if (c === 8216 || c === 8217) { out += "'"; continue; }
+          if (c === 8220 || c === 8221) { out += '"'; continue; }
+          // Puntos suspensivos tipograficos
+          if (c === 8230) { out += '...'; continue; }
+          // Resto (emoji BMP, simbolos) -> omitir
+        }
+        return out.replace(/ +/g, ' ').trim();
       }
 
-      // Fecha
-      doc.setFont('times','italic'); doc.setFontSize(10);
-      doc.text('Documento generado: ' + new Date().toLocaleDateString('es-ES'), PAGE_W/2, PAGE_H - 80, {align:'center'});
-
-      newPage();
-
-      // ── 0. CONTEXTO DEL AULA ─────────────────────────────────────────────
-      var ctxBloque = document.getElementById('bloque-contexto');
-      if (ctxBloque) {
-        addH1('0. CONTEXTO DEL AULA');
-        addLabelValue('Centro', textOf('[data-ctx="centro-nombre"]'));
-        addLabelValue('Tipo de centro', textOf('[data-ctx="tipo-centro"]'));
-        addLabelValue('Nivel', nivelTx + ' (2º ciclo EI)');
-        addLabelValue('Nº alumnos/as', nal);
-        addLabelValue('Descripción del grupo', textOf('[data-ctx="desc-alumnado"]'));
-        addLabelValue('Alumnado con NEAE', textOf('[data-ctx="neae"]'));
-        addSep();
+      function txtDe(sel, root) {
+        root = root || document;
+        var el = (typeof sel === 'string') ? root.querySelector(sel) : sel;
+        return el ? limpiar(el.textContent) : '';
       }
 
-      // ── ASPECTOS GENERALES ────────────────────────────────────────────────
-      addH1('ASPECTOS GENERALES DE LA PROGRAMACIÓN');
+      // ── Estado pagina ──────────────────────────────────────────────
+      var pag = 1;
+      var y   = MT;
+      var secLabel = '';
 
-      document.querySelectorAll('#vista-aspectos .bloque').forEach(function(bloque) {
-        var titulo = textOf('.bloque-title', bloque);
-        if (titulo) addH2(cleanText(titulo));
+      // ── Cabecera y pie (se llama al crear pagina) ──────────────────
+      function cabeceraYPie(n, sec) {
+        var prev = doc.internal.getCurrentPageInfo().pageNumber;
+        doc.setPage(n);
+        if (n > 1) {
+          // banda superior
+          doc.setFillColor(HC[0], HC[1], HC[2]);
+          doc.rect(0, 0, PW, 24, 'F');
+          doc.setFont('helvetica', 'bold');
+          doc.setFontSize(7);
+          doc.setTextColor(255, 255, 255);
+          doc.text('PROGRAMACION DIDACTICA ANUAL - 2o ciclo EI - Andalucia 2026-27', ML, 15);
+          if (sec) doc.text(sec, PW - MR, 15, { align: 'right' });
+          doc.setTextColor(0, 0, 0);
+        }
+        // pie
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(7.5);
+        doc.setTextColor(160, 160, 160);
+        doc.text('PDA EI ' + nivelTx + '  |  Hilo: ' + hiloNom + '  |  Andalucia 2026-27', ML, PH - 18);
+        doc.text('Pag. ' + n, PW - MR, PH - 18, { align: 'right' });
+        doc.setTextColor(0, 0, 0);
+        doc.setPage(prev);
+      }
 
-        // párrafos directos
-        bloque.querySelectorAll(':scope > p, :scope > .contenido-texto > p').forEach(function(p) {
-          addPara(p.textContent);
-        });
+      function nuevaPag(sec) {
+        doc.addPage();
+        pag++;
+        if (sec !== undefined) secLabel = sec;
+        cabeceraYPie(pag, secLabel);
+        y = MT + 30; // bajo la cabecera
+        return pag;
+      }
 
-        // listas
-        bloque.querySelectorAll(':scope > ul, :scope > .contenido-texto > ul').forEach(function(ul) {
-          ul.querySelectorAll('li').forEach(function(li) {
-            addPara('• ' + li.textContent.trim());
-          });
-        });
+      function checkY(h) {
+        if (y + h > PH - MB) nuevaPag();
+      }
 
-        // tablas: filas th/td
-        bloque.querySelectorAll('table').forEach(function(tbl) {
-          tbl.querySelectorAll('tr').forEach(function(tr) {
-            var ths = tr.querySelectorAll('th');
-            var tds = tr.querySelectorAll('td');
-            if (ths.length && tds.length) {
-              addLabelValue(ths[0].textContent.trim(), tds[0].textContent.trim());
-            }
-          });
-        });
+      // ── Utilidades tipograficas ────────────────────────────────────
+      function hexARGB(hex) {
+        var h = (hex || '#1e88e5').replace('#', '');
+        if (h.length === 3) h = h[0]+h[0]+h[1]+h[1]+h[2]+h[2];
+        return [
+          parseInt(h.slice(0,2), 16) || 0,
+          parseInt(h.slice(2,4), 16) || 0,
+          parseInt(h.slice(4,6), 16) || 0
+        ];
+      }
 
-        addSep();
+      function encabezadoSeccion(txt, col) {
+        col = col || HC;
+        checkY(30);
+        doc.setFillColor(col[0], col[1], col[2]);
+        doc.rect(ML - 6, y - 16, CW + 12, 24, 'F');
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(11);
+        doc.setTextColor(255, 255, 255);
+        var ls = doc.splitTextToSize(limpiar(txt), CW - 12);
+        doc.text(ls[0] || '', ML, y);
+        y += ls.length > 1 ? 22 : 14;
+        doc.setTextColor(0, 0, 0);
+        doc.setFont('times', 'normal');
+        doc.setFontSize(11);
+      }
+
+      function subencabezado(txt) {
+        checkY(22);
+        y += 4;
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(10);
+        doc.setTextColor(HC[0], HC[1], HC[2]);
+        doc.text(limpiar(txt), ML, y);
+        y += 5;
+        doc.setDrawColor(HC[0], HC[1], HC[2]);
+        doc.setLineWidth(0.4);
+        doc.line(ML, y, ML + CW * 0.5, y);
+        y += 8;
+        doc.setDrawColor(0, 0, 0);
+        doc.setTextColor(0, 0, 0);
+        doc.setFont('times', 'normal');
+        doc.setFontSize(11);
+      }
+
+      function subsubencabezado(txt) {
+        checkY(18);
+        y += 2;
+        doc.setFont('helvetica', 'bolditalic');
+        doc.setFontSize(9.5);
+        doc.setTextColor(70, 70, 70);
+        doc.text(limpiar(txt), ML + 8, y);
+        y += 14;
+        doc.setTextColor(0, 0, 0);
+        doc.setFont('times', 'normal');
+        doc.setFontSize(11);
+      }
+
+      function para(txt, ind) {
+        if (!txt) return;
+        txt = limpiar(txt);
+        if (!txt) return;
+        ind = ind || 0;
+        doc.setFont('times', 'normal');
+        doc.setFontSize(11);
+        doc.setTextColor(20, 20, 20);
+        var ls = doc.splitTextToSize(txt, CW - ind);
+        checkY(ls.length * LH + 2);
+        doc.text(ls, ML + ind, y);
+        y += ls.length * LH + 3;
+        doc.setTextColor(0, 0, 0);
+      }
+
+      function bullet(txt) {
+        if (!txt) return;
+        txt = limpiar(txt);
+        if (!txt) return;
+        doc.setFont('times', 'normal');
+        doc.setFontSize(10.5);
+        doc.setTextColor(20, 20, 20);
+        var ls = doc.splitTextToSize('- ' + txt, CW - 14);
+        checkY(ls.length * LH + 1);
+        doc.text(ls, ML + 10, y);
+        y += ls.length * LH + 2;
+        doc.setTextColor(0, 0, 0);
+      }
+
+      function sep() {
+        y += 5;
+        doc.setDrawColor(210, 210, 210);
+        doc.setLineWidth(0.3);
+        doc.line(ML, y, ML + CW, y);
+        y += 7;
+        doc.setDrawColor(0, 0, 0);
+      }
+
+      // ── ToC ────────────────────────────────────────────────────────
+      var toc = [];
+      function tocAdd(titulo, pg) { toc.push({ t: titulo, p: pg }); }
+
+      // ═══════════════════════════════════════════════════════════════
+      // PORTADA (pagina 1)
+      // ═══════════════════════════════════════════════════════════════
+      doc.setFillColor(HC[0], HC[1], HC[2]);
+      doc.rect(0, 0, PW, 210, 'F');
+      doc.setFillColor(255, 255, 255, 0.08);
+      doc.rect(0, 210, PW, 3, 'F');
+
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(21);
+      doc.setTextColor(255, 255, 255);
+      doc.text('PROGRAMACION DIDACTICA ANUAL', PW / 2, 72, { align: 'center' });
+      doc.setFontSize(13);
+      doc.text('2o Ciclo de Educacion Infantil - Andalucia', PW / 2, 100, { align: 'center' });
+      doc.text('Curso 2026-2027', PW / 2, 120, { align: 'center' });
+      doc.setFont('helvetica', 'bolditalic');
+      doc.setFontSize(16);
+      doc.text('Hilo conductor: ' + hiloNom, PW / 2, 158, { align: 'center' });
+      doc.setTextColor(0, 0, 0);
+
+      // Datos del centro (parte blanca)
+      var yP = 240;
+      doc.setFont('times', 'italic');
+      doc.setFontSize(10);
+      doc.setTextColor(120, 120, 120);
+      doc.text('Datos del centro', PW / 2, yP, { align: 'center' });
+      yP += 16;
+      doc.setFont('times', 'normal');
+      doc.setFontSize(12);
+      doc.setTextColor(40, 40, 40);
+
+      var datosPortada = [];
+      if (centro) datosPortada.push('Centro: ' + limpiar(centro));
+      datosPortada.push('Nivel: ' + limpiar(nivelTx) + ' (2o ciclo EI)');
+      if (tipoCt) datosPortada.push('Tipo de centro: ' + limpiar(tipoCt));
+      if (nal)    datosPortada.push('N. alumnos/as: ' + nal);
+
+      datosPortada.forEach(function(d) {
+        doc.text(d, PW / 2, yP, { align: 'center' });
+        yP += 18;
       });
 
-      // ── 12 UDs ────────────────────────────────────────────────────────────
-      // (hiloActivoId ya está declarado arriba en la sección portada)
+      doc.setFont('times', 'italic');
+      doc.setFontSize(8.5);
+      doc.setTextColor(160, 160, 160);
+      doc.text('Generado el ' + new Date().toLocaleDateString('es-ES'), PW / 2, PH - 40, { align: 'center' });
+      cabeceraYPie(1, '');
+      doc.setTextColor(0, 0, 0);
+
+      // ═══════════════════════════════════════════════════════════════
+      // INDICE: reservar pagina 2 (se rellena al final)
+      // ═══════════════════════════════════════════════════════════════
+      doc.addPage();
+      pag = 2;
+      cabeceraYPie(2, 'INDICE DE CONTENIDOS');
+
+      // ═══════════════════════════════════════════════════════════════
+      // ASPECTOS GENERALES (9 secciones)
+      // ═══════════════════════════════════════════════════════════════
+      var ATIT = [
+        '0. CONTEXTO DEL AULA',
+        '1. MARCO LEGAL',
+        '2. OBJETIVOS GENERALES DE LA ETAPA',
+        '3. PRINCIPIOS PEDAGOGICOS',
+        '4. DUA - DISENO UNIVERSAL PARA EL APRENDIZAJE',
+        '5. ATENCION A LA DIVERSIDAD E INCLUSION',
+        '6. TEMPORIZACION GLOBAL - 12 SITUACIONES DE APRENDIZAJE',
+        '7. EVALUACION - CRITERIOS, HERRAMIENTAS E INSTRUMENTOS',
+        '8. ACTIVIDADES COMPLEMENTARIAS'
+      ];
+
+      var abloques = Array.from(document.querySelectorAll('#vista-aspectos .bloque'));
+      var aIdx = 0;
+      abloques.forEach(function(bl) {
+        var titulo = (aIdx < ATIT.length) ? ATIT[aIdx] : txtDe('.bloque-title', bl);
+        aIdx++;
+
+        var pg = nuevaPag(titulo.length > 30 ? titulo.substring(0, 28) + '...' : titulo);
+        tocAdd(titulo, pg);
+        encabezadoSeccion(titulo);
+        y += 4;
+
+        // Parrafos
+        bl.querySelectorAll('p').forEach(function(p) {
+          var t = limpiar(p.textContent);
+          if (t.length > 5) para(t);
+        });
+
+        // Listas
+        bl.querySelectorAll('li').forEach(function(li) {
+          var t = limpiar(li.textContent);
+          if (t.length > 2) bullet(t);
+        });
+
+        // Tablas -> autoTable
+        bl.querySelectorAll('table').forEach(function(tbl) {
+          var hdrs = [];
+          var rows = [];
+          var thead = tbl.querySelector('thead');
+          if (thead) {
+            thead.querySelectorAll('th').forEach(function(th) {
+              hdrs.push(limpiar(th.textContent));
+            });
+          }
+          tbl.querySelectorAll('tbody tr, tr').forEach(function(tr, ri) {
+            // saltar fila de cabecera si ya se proceso
+            if (ri === 0 && hdrs.length > 0 &&
+                tr.querySelectorAll('th').length === tr.children.length) return;
+            var row = [];
+            tr.querySelectorAll('td, th').forEach(function(cell) {
+              row.push(limpiar(cell.textContent));
+            });
+            if (row.length > 0 && row.some(function(c) { return c.length > 0; })) {
+              rows.push(row);
+            }
+          });
+
+          if (rows.length > 0) {
+            checkY(50);
+            doc.autoTable({
+              startY: y,
+              head: hdrs.length > 0 ? [hdrs] : undefined,
+              body: rows,
+              theme: 'grid',
+              styles: {
+                fontSize: 9, cellPadding: 3.5,
+                font: 'times', overflow: 'linebreak',
+                textColor: [20, 20, 20]
+              },
+              headStyles: {
+                fillColor: HC, textColor: [255, 255, 255],
+                fontStyle: 'bold', fontSize: 9.5
+              },
+              alternateRowStyles: { fillColor: [248, 249, 252] },
+              margin: { left: ML, right: MR },
+              tableWidth: CW
+            });
+            y = doc.lastAutoTable.finalY + 10;
+          }
+        });
+
+        sep();
+      });
+
+      // ═══════════════════════════════════════════════════════════════
+      // 12 SITUACIONES DE APRENDIZAJE
+      // ═══════════════════════════════════════════════════════════════
       for (var udN = 0; udN < 12; udN++) {
         var udSec = document.getElementById('ud' + udN);
         if (!udSec) continue;
 
-        newPage();
+        var udHex = udSec.getAttribute('data-color') || '#1e88e5';
+        var udRGB = hexARGB(udHex);
+        var udTit = txtDe('.ud-titulo', udSec) || ('SA ' + (udN + 1));
 
-        var udTitle = textOf('.ud-header-title', udSec) || ('UD ' + (udN + 1));
-        // Miniatura del personaje en esquina de cada SA
-        if (hiloActivoId && PERSONAJES_IMG[hiloActivoId]) {
-          try { doc.addImage(PERSONAJES_IMG[hiloActivoId], 'PNG', PAGE_W - MR - 55, MT, 50, 64); } catch(e) {}
+        var saShort = 'SA ' + (udN + 1);
+        var pSA = nuevaPag(saShort);
+        tocAdd(saShort + ': ' + udTit, pSA);
+
+        // ── Cabecera de la SA ──────────────────────────────────────
+        var altCab = 40;
+        doc.setFillColor(udRGB[0], udRGB[1], udRGB[2]);
+        doc.rect(ML - 6, y - 18, CW + 12, altCab, 'F');
+
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(12);
+        doc.setTextColor(255, 255, 255);
+        var saLabel2 = 'SA ' + (udN + 1) + ': ' + udTit.toUpperCase();
+        var saLs = doc.splitTextToSize(saLabel2, CW - 10);
+        doc.text(saLs[0] || '', ML, y);
+        y += saLs.length > 1 ? 20 : 14;
+        y += altCab - 18 - (saLs.length > 1 ? 20 : 14) + 10;
+
+        var metaEl = udSec.querySelector('.ud-mes');
+        if (metaEl) {
+          doc.setFont('helvetica', 'normal');
+          doc.setFontSize(9);
+          doc.setTextColor(220, 220, 220);
+          doc.text(limpiar(metaEl.textContent), ML, y - 8);
         }
-        addH1('SITUACIÓN DE APRENDIZAJE ' + (udN + 1) + ': ' + udTitle.toUpperCase());
+        doc.setTextColor(0, 0, 0);
+        y += 6;
 
-
-        // Sub-secciones (bloques dentro de la UD)
-        udSec.querySelectorAll('.bloque').forEach(function(bloque) {
-          var bTit = textOf('.bloque-title', bloque);
-          if (bTit) addH2(cleanText(bTit));
-
-          bloque.querySelectorAll('p, li').forEach(function(el) {
-            var prefix = el.tagName === 'LI' ? '• ' : '';
-            addPara(prefix + el.textContent.trim());
-          });
-
-          bloque.querySelectorAll('table tr').forEach(function(tr) {
-            var ths = tr.querySelectorAll('th');
-            var tds = tr.querySelectorAll('td');
-            if (ths.length && tds.length) {
-              addLabelValue(ths[0].textContent.trim(), tds[0].textContent.trim());
+        // ── FICHA (sda-table -> autoTable) ─────────────────────────
+        var sdaTbl = udSec.querySelector('.sda-table');
+        if (sdaTbl) {
+          var sdaBody = [];
+          sdaTbl.querySelectorAll('tr').forEach(function(tr) {
+            var ths = Array.from(tr.querySelectorAll('th'));
+            var tds = Array.from(tr.querySelectorAll('td'));
+            if (ths.length === 2 && tds.length === 2) {
+              // 2 pares etiqueta-valor en la misma fila
+              sdaBody.push([
+                { content: limpiar(ths[0].textContent),
+                   styles: { fontStyle: 'bold', fillColor: [235, 242, 255], textColor: [20, 20, 60] } },
+                limpiar(tds[0].textContent),
+                { content: limpiar(ths[1].textContent),
+                   styles: { fontStyle: 'bold', fillColor: [235, 242, 255], textColor: [20, 20, 60] } },
+                limpiar(tds[1].textContent)
+              ]);
+            } else if (ths.length >= 1 && tds.length >= 1) {
+              // etiqueta + valor que ocupa todo el ancho
+              var val = Array.from(tds).map(function(td) {
+                return limpiar(td.textContent);
+              }).join(' | ');
+              sdaBody.push([
+                { content: limpiar(ths[0].textContent),
+                   styles: { fontStyle: 'bold', fillColor: [235, 242, 255], textColor: [20, 20, 60] } },
+                { content: val, colSpan: 3 }
+              ]);
             }
           });
 
-          addSep();
+          if (sdaBody.length > 0) {
+            checkY(60);
+            doc.autoTable({
+              startY: y,
+              body: sdaBody,
+              theme: 'grid',
+              styles: {
+                fontSize: 9.5, cellPadding: 4,
+                font: 'times', overflow: 'linebreak',
+                textColor: [20, 20, 50]
+              },
+              columnStyles: {
+                0: { cellWidth: 110 },
+                1: { cellWidth: 'auto' },
+                2: { cellWidth: 95 },
+                3: { cellWidth: 'auto' }
+              },
+              margin: { left: ML, right: MR },
+              tableWidth: CW
+            });
+            y = doc.lastAutoTable.finalY + 12;
+          }
+        }
+
+        // ── JUSTIFICACION ──────────────────────────────────────────
+        var justBl = udSec.querySelector('.bloque-just');
+        if (justBl) {
+          subencabezado('Justificacion');
+          var jTxts = ['.just-narrativa', '.just-texto'];
+          jTxts.forEach(function(sel) {
+            var el = justBl.querySelector(sel);
+            if (el) { var t = limpiar(el.textContent); if (t) para(t); }
+          });
+          if (!justBl.querySelector('.just-narrativa') && !justBl.querySelector('.just-texto')) {
+            justBl.querySelectorAll('p').forEach(function(p) {
+              var t = limpiar(p.textContent);
+              if (t) para(t);
+            });
+          }
+        }
+
+        // ── CONCRECION CURRICULAR (tablas) ─────────────────────────
+        var ccBls = udSec.querySelectorAll('.bloque-cc');
+        if (ccBls.length > 0) {
+          subencabezado('Concrecion Curricular');
+          ccBls.forEach(function(ccBl) {
+            var ccTit = txtDe('.bloque-title', ccBl);
+            if (ccTit) subsubencabezado(ccTit);
+            ccBl.querySelectorAll('table').forEach(function(tbl) {
+              var hdrs2 = [];
+              var rows2 = [];
+              var thead2 = tbl.querySelector('thead');
+              if (thead2) thead2.querySelectorAll('th').forEach(function(th) {
+                hdrs2.push(limpiar(th.textContent));
+              });
+              tbl.querySelectorAll('tbody tr').forEach(function(tr) {
+                var row = [];
+                tr.querySelectorAll('td').forEach(function(td) {
+                  row.push(limpiar(td.textContent));
+                });
+                if (row.some(function(c) { return c.length > 0; })) rows2.push(row);
+              });
+              if (rows2.length > 0) {
+                checkY(50);
+                doc.autoTable({
+                  startY: y,
+                  head: hdrs2.length > 0 ? [hdrs2] : undefined,
+                  body: rows2,
+                  theme: 'striped',
+                  styles: { fontSize: 8.5, cellPadding: 3, font: 'times', overflow: 'linebreak' },
+                  headStyles: { fillColor: udRGB, textColor: [255,255,255], fontStyle: 'bold' },
+                  margin: { left: ML, right: MR },
+                  tableWidth: CW
+                });
+                y = doc.lastAutoTable.finalY + 8;
+              }
+            });
+            ccBl.querySelectorAll('li').forEach(function(li) {
+              var t = limpiar(li.textContent);
+              if (t) bullet(t);
+            });
+          });
+        }
+
+        // ── EVALUACION INICIAL ─────────────────────────────────────
+        var evIniBl = udSec.querySelector('.bloque-ev-ini');
+        if (evIniBl) {
+          subencabezado('Evaluacion Inicial');
+          evIniBl.querySelectorAll('p, li').forEach(function(el) {
+            var t = limpiar(el.textContent);
+            if (t) (el.tagName === 'LI' ? bullet : para)(t);
+          });
+        }
+
+        // ── PRODUCTO FINAL ─────────────────────────────────────────
+        var prodBl = udSec.querySelector('.bloque-producto');
+        if (prodBl) {
+          subencabezado('Producto Final');
+          prodBl.querySelectorAll('p, li').forEach(function(el) {
+            var t = limpiar(el.textContent);
+            if (t) (el.tagName === 'LI' ? bullet : para)(t);
+          });
+        }
+
+        // ── ACTIVIDADES / SECUENCIA DIDACTICA ─────────────────────
+        // Buscamos el bloque generico con actividades Kolb (no tiene clase especifica)
+        var actBl = null;
+        udSec.querySelectorAll('.bloque').forEach(function(bl) {
+          var bc = bl.className || '';
+          var esEspecifico = (
+            bc.indexOf('bloque-informe') >= 0 || bc.indexOf('bloque-just') >= 0 ||
+            bc.indexOf('bloque-cc') >= 0 || bc.indexOf('bloque-dgrid') >= 0 ||
+            bc.indexOf('bloque-ev-ini') >= 0 || bc.indexOf('bloque-producto') >= 0 ||
+            bc.indexOf('bloque-conclusion') >= 0 || bc.indexOf('bloque-epd') >= 0 ||
+            bc.indexOf('bloque-ind') >= 0
+          );
+          if (!esEspecifico && !actBl) {
+            var bTit2 = txtDe('.bloque-title', bl);
+            if (bTit2.indexOf('ctividad') >= 0 || bTit2.indexOf('ecuen') >= 0 || bTit2.indexOf('KOLB') >= 0) {
+              actBl = bl;
+            }
+          }
         });
+
+        if (actBl) {
+          subencabezado('Secuenciacion Didactica (Modelo Kolb)');
+          actBl.querySelectorAll('.actividad-oficial, .actividad').forEach(function(act) {
+            var faseEl = act.querySelector('.act-fase-nombre, .fase-nombre, .fase');
+            var fase   = faseEl ? limpiar(faseEl.textContent) : '';
+            if (fase) subsubencabezado(fase);
+
+            act.querySelectorAll('p').forEach(function(p) {
+              var t = limpiar(p.textContent);
+              if (t && t.length > 5) para(t, 12);
+            });
+
+            var duaEl = act.querySelector('.dua-strip');
+            if (duaEl) {
+              var duaTxt = limpiar(duaEl.textContent);
+              if (duaTxt && duaTxt.length > 3) {
+                doc.setFont('helvetica', 'normal');
+                doc.setFontSize(8);
+                doc.setTextColor(100, 100, 100);
+                var duaLs = doc.splitTextToSize('DUA: ' + duaTxt, CW - 24);
+                checkY(duaLs.length * 11 + 2);
+                doc.text(duaLs, ML + 18, y);
+                y += duaLs.length * 11 + 3;
+                doc.setTextColor(0, 0, 0);
+              }
+            }
+          });
+        }
+
+        // ── EVALUACION DE LA PRACTICA DOCENTE ─────────────────────
+        var epdBl = udSec.querySelector('.bloque-epd');
+        if (epdBl) {
+          subencabezado('Evaluacion de la Practica Docente');
+          epdBl.querySelectorAll('p, li').forEach(function(el) {
+            var t = limpiar(el.textContent);
+            if (t) (el.tagName === 'LI' ? bullet : para)(t);
+          });
+        }
+
+        // ── INDICADORES DE LOGRO ───────────────────────────────────
+        var indBl = udSec.querySelector('.bloque-ind');
+        if (indBl) {
+          subencabezado('Indicadores de Logro');
+          indBl.querySelectorAll('li').forEach(function(li) {
+            var t = limpiar(li.textContent);
+            if (t) bullet(t);
+          });
+          indBl.querySelectorAll('p').forEach(function(p) {
+            var t = limpiar(p.textContent);
+            if (t) para(t);
+          });
+        }
+
+        sep();
       }
 
-      // ── Guardar ──────────────────────────────────────────────────────────
-      var nivel = nivelEl ? nivelEl.value : '5a';
-      var fname = 'PDA_EI_' + nivel + '_Andalucia_2026-27.pdf';
+      // ═══════════════════════════════════════════════════════════════
+      // RELLENAR EL INDICE (pagina 2)
+      // ═══════════════════════════════════════════════════════════════
+      doc.setPage(2);
+      var yI = MT + 30;
+
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(16);
+      doc.setTextColor(HC[0], HC[1], HC[2]);
+      doc.text('INDICE DE CONTENIDOS', ML, yI);
+      yI += 8;
+      doc.setDrawColor(HC[0], HC[1], HC[2]);
+      doc.setLineWidth(1.2);
+      doc.line(ML, yI, ML + CW, yI);
+      yI += 16;
+      doc.setDrawColor(0, 0, 0);
+
+      toc.forEach(function(e) {
+        if (yI > PH - MB - 10) return;
+        var isSA = e.t.indexOf('SA ') === 0;
+
+        if (!isSA) {
+          doc.setFont('times', 'bold');
+          doc.setFontSize(10.5);
+          doc.setTextColor(30, 30, 30);
+        } else {
+          doc.setFont('times', 'normal');
+          doc.setFontSize(10);
+          doc.setTextColor(70, 70, 70);
+        }
+
+        var eLabel = e.t;
+        var ePag   = String(e.p);
+        var dotW   = doc.getTextWidth('.');
+        var lblW   = doc.getTextWidth(eLabel + '  ');
+        var pagW   = doc.getTextWidth('  ' + ePag);
+        var nDots  = Math.max(3, Math.floor((CW - lblW - pagW) / dotW));
+        var dots   = new Array(nDots + 1).join('.');
+
+        doc.text(eLabel, ML, yI);
+        doc.setTextColor(190, 190, 190);
+        doc.text(dots, ML + lblW, yI);
+        doc.setTextColor(isSA ? 70 : 30, isSA ? 70 : 30, isSA ? 70 : 30);
+        doc.text(ePag, PW - MR, yI, { align: 'right' });
+
+        yI += isSA ? 14 : 17;
+      });
+
+      // ═══════════════════════════════════════════════════════════════
+      // GUARDAR
+      // ═══════════════════════════════════════════════════════════════
+      var fname = 'PDA_EI_' + nivelVl + '_Andalucia_2026-27.pdf';
       doc.save(fname);
 
     } catch(err) {
       console.error('Error generando PDF:', err);
       alert('Error al generar el PDF: ' + err.message);
     } finally {
-      if (btn) { btn.textContent = '📄 Descargar PDF'; btn.disabled = false; }
+      if (btn) { btn.textContent = 'Descargar PDF'; btn.disabled = false; }
     }
   });
 }
