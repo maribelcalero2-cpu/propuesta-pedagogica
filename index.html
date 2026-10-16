@@ -6416,7 +6416,9 @@ function generarPDF() {
 
       function addPara(txt) {
         if (!txt || !txt.trim()) return;
-        var lines = doc.splitTextToSize(txt.trim(), CW);
+        txt = cleanText(txt);
+        if (!txt) return;
+        var lines = doc.splitTextToSize(txt, CW);
         checkY(lines.length * LH12);
         doc.setFont('times','normal'); doc.setFontSize(12);
         doc.text(lines, ML, y);
@@ -6425,7 +6427,10 @@ function generarPDF() {
 
       function addLabelValue(label, value) {
         if (!value || !value.trim()) return;
-        var full = label + ': ' + value.trim();
+        label = cleanText(label) || label;
+        value = cleanText(value);
+        if (!value) return;
+        var full = label + ': ' + value;
         var lines = doc.splitTextToSize(full, CW);
         checkY(lines.length * LH12);
         // label en negrita, valor en normal — primer segmento
@@ -6434,7 +6439,7 @@ function generarPDF() {
         doc.text(label + ': ', ML, y);
         doc.setFont('times','normal');
         // resto de la primera línea
-        var rest = value.trim();
+        var rest = value;
         var restLines = doc.splitTextToSize(rest, CW - lw);
         doc.text(restLines[0], ML + lw, y);
         y += LH12;
@@ -6466,6 +6471,20 @@ function generarPDF() {
         var out = [];
         root.querySelectorAll(sel).forEach(function(el) { out.push(el.textContent.trim()); });
         return out;
+      }
+
+      // Elimina emoji/símbolos que jsPDF Times Roman no puede renderizar
+      // y sustituye el nombre de MILO por el del personaje del hilo activo
+      function cleanText(s) {
+        if (!s) return '';
+        // Sustituir MILO por el personaje activo (la variable hiloActivoId se asigna antes de que se llame a esta función)
+        var _hiloNom = {milo:'MILO',gaia:'GAIA',lua:'LUA',nuno:'NUNO',ora:'ORA'};
+        var _nomAct = _hiloNom[hiloActivoId] || 'MILO';
+        if (_nomAct !== 'MILO') s = s.replace(/MILO/g, _nomAct);
+        // Conservar: ASCII básico + Latín con tilde (español) + rayas y comillas tipográficas
+        // Eliminar: emoji, CJK, cirílico y cualquier cosa fuera de ese rango
+        return s.replace(/[^ -ÿĀ-ɏ–—‘’“”«»]/g, '')
+                .replace(/\s+/g, ' ').trim();
       }
 
       // ── PORTADA ──────────────────────────────────────────────────────────
@@ -6533,7 +6552,7 @@ function generarPDF() {
 
       document.querySelectorAll('#vista-aspectos .bloque').forEach(function(bloque) {
         var titulo = textOf('.bloque-title', bloque);
-        if (titulo) addH2(titulo.replace(/^[🏛️🎯📜🌿💡🔬📚🏫✏️🧩🌍⚖️🤝💪📊🧪🎭🏃‍♂️📝]/u,'').trim());
+        if (titulo) addH2(cleanText(titulo));
 
         // párrafos directos
         bloque.querySelectorAll(':scope > p, :scope > .contenido-texto > p').forEach(function(p) {
@@ -6576,29 +6595,11 @@ function generarPDF() {
         }
         addH1('SITUACIÓN DE APRENDIZAJE ' + (udN + 1) + ': ' + udTitle.toUpperCase());
 
-        // Meta: info general
-        var udMeta = textOf('.ud-meta', udSec);
-        if (udMeta) addPara(udMeta);
-        y += 4;
-
-        // Tabla informe
-        udSec.querySelectorAll('.sda-table tr').forEach(function(tr) {
-          var cells = tr.querySelectorAll('th, td');
-          if (cells.length >= 2) {
-            for (var ci = 0; ci + 1 < cells.length; ci += 2) {
-              var lbl = cells[ci].textContent.trim();
-              var val = cells[ci+1].textContent.trim();
-              if (lbl && val) addLabelValue(lbl, val);
-            }
-          }
-        });
-
-        addSep();
 
         // Sub-secciones (bloques dentro de la UD)
         udSec.querySelectorAll('.bloque').forEach(function(bloque) {
           var bTit = textOf('.bloque-title', bloque);
-          if (bTit) addH2(bTit.replace(/^[📋🎯📜🌿💡🔬🏃‍♂️📊🧩✏️🎭📝⚖️]/u,'').trim());
+          if (bTit) addH2(cleanText(bTit));
 
           bloque.querySelectorAll('p, li').forEach(function(el) {
             var prefix = el.tagName === 'LI' ? '• ' : '';
