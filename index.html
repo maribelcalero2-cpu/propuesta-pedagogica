@@ -134,6 +134,76 @@ body {
 .hilo-sa-ods { font-size:10px; color:#4ade80; font-weight:700; margin-left:auto; white-space:nowrap; }
 .hilo-producto { font-size:11px; color:#a78bfa; margin-top:10px; font-style:italic; }
 .hilo-producto strong { color:#c4b5fd; }
+
+/* ── Formulario hilo personalizado ── */
+#libre-form {
+  margin-top: 12px; background: rgba(255,255,255,.05);
+  border: 1px dashed #c9a055; border-radius: 10px;
+  padding: 14px; display: none;
+}
+#libre-form.visible { display: block; }
+.libre-section-title {
+  font-size: 12px; font-weight: 700; color: #c9a055;
+  text-transform: uppercase; letter-spacing: .06em;
+  margin: 12px 0 6px; border-bottom: 1px solid rgba(201,160,85,.3);
+  padding-bottom: 4px;
+}
+.libre-row { display: flex; gap: 8px; margin-bottom: 8px; }
+.libre-field { flex: 1; display: flex; flex-direction: column; gap: 4px; }
+.libre-label { font-size: 11px; color: #94a3b8; font-weight: 600; }
+.libre-input, .libre-textarea, .libre-select {
+  background: rgba(0,0,0,.35); border: 1px solid #475569;
+  color: #e2e8f0; border-radius: 6px; padding: 6px 10px;
+  font-size: 12px; font-family: inherit;
+  transition: border-color .15s;
+}
+.libre-input:focus, .libre-textarea:focus, .libre-select:focus {
+  outline: none; border-color: #c9a055;
+}
+.libre-textarea { min-height: 60px; resize: vertical; }
+.libre-emoji { max-width: 64px; text-align: center; font-size: 18px; }
+.libre-gen-btn {
+  width: 100%; margin: 10px 0 6px;
+  background: linear-gradient(135deg, #7b9e87, #9b7fa6);
+  border: none; color: #fff; border-radius: 8px;
+  padding: 8px 14px; font-size: 12px; font-weight: 700;
+  cursor: pointer; transition: opacity .15s; letter-spacing: .03em;
+}
+.libre-gen-btn:hover { opacity: .85; }
+.libre-sas-grid {
+  display: grid; grid-template-columns: 1fr 1fr;
+  gap: 6px; margin-top: 8px;
+}
+@media (max-width: 600px) { .libre-sas-grid { grid-template-columns: 1fr; } }
+.libre-sa-row {
+  display: flex; align-items: center; gap: 6px;
+  background: rgba(0,0,0,.2); border-radius: 6px;
+  padding: 5px 8px; border: 1px solid #334155;
+}
+.libre-sa-num {
+  font-size: 10px; font-weight: 800; color: #c9a055;
+  min-width: 22px; text-align: center;
+}
+.libre-sa-titulo {
+  flex: 1; background: transparent; border: none;
+  color: #e2e8f0; font-size: 11px; font-family: inherit;
+  border-bottom: 1px dotted #475569;
+}
+.libre-sa-titulo:focus { outline: none; border-bottom-color: #c9a055; }
+.libre-sa-ods {
+  background: rgba(0,0,0,.3); border: 1px solid #475569;
+  color: #94a3b8; font-size: 10px; border-radius: 4px;
+  padding: 2px 4px; width: 72px;
+}
+.libre-apply-btn {
+  width: 100%; margin-top: 10px;
+  background: #0f766e; border: none; color: #fff;
+  border-radius: 8px; padding: 9px 14px;
+  font-size: 13px; font-weight: 700; cursor: pointer;
+  transition: background .15s;
+}
+.libre-apply-btn:hover { background: #0d5f58; }
+
 .config-close-btn {
   background: #1e293b; border: 1px solid #475569; color:#94a3b8;
   border-radius:6px; padding:5px 14px; cursor:pointer; font-size:12px;
@@ -561,6 +631,7 @@ body {
         <select class="config-select" id="sel-tipo" onchange="filterHilos()">
           <option value="mascotas">🐾 Mascota / Personaje</option>
           <option value="tematicos">🌍 Temático (sin personaje)</option>
+          <option value="personalizado">✏️ Crea tu propio hilo</option>
         </select>
       </div>
       <div class="config-field">
@@ -569,6 +640,68 @@ body {
       </div>
     </div>
     <div id="hilo-card" class="hilo-card" hidden></div>
+
+    <!-- ── Formulario hilo personalizado ── -->
+    <div id="libre-form">
+      <div class="libre-section-title">📌 Datos básicos del hilo</div>
+      <div class="libre-row">
+        <div class="libre-field" style="max-width:64px;">
+          <label class="libre-label">Emoji</label>
+          <input type="text" class="libre-input libre-emoji" id="libre-emoji" placeholder="🌟" maxlength="2" value="🌟">
+        </div>
+        <div class="libre-field" style="flex:2;">
+          <label class="libre-label">Nombre de la mascota o hilo</label>
+          <input type="text" class="libre-input" id="libre-nombre" placeholder="Ej: LUNA, LOS SUEÑOS, EL VIAJERO…">
+        </div>
+        <div class="libre-field" style="flex:2;">
+          <label class="libre-label">Subtítulo / lema</label>
+          <input type="text" class="libre-input" id="libre-subtitulo" placeholder="Ej: La pequeña exploradora del cosmos">
+        </div>
+      </div>
+      <div class="libre-row">
+        <div class="libre-field">
+          <label class="libre-label">Descripción del personaje o temática <span style="font-weight:400;">(quién es, de dónde viene, qué hace)</span></label>
+          <textarea class="libre-textarea" id="libre-descripcion" placeholder="Describe la mascota o temática: cómo es, dónde vive, qué problema tiene que resolver con la ayuda de los niños/as…"></textarea>
+        </div>
+      </div>
+      <div class="libre-row">
+        <div class="libre-field">
+          <label class="libre-label">Mecánica de aula <span style="font-weight:400;">(¿cómo arranca cada SA?)</span></label>
+          <textarea class="libre-textarea" id="libre-mecanica" placeholder="Ej: Al inicio de cada SA llega un mensaje al aula…"></textarea>
+        </div>
+        <div class="libre-field">
+          <label class="libre-label">Producto final del curso</label>
+          <textarea class="libre-textarea" id="libre-producto" placeholder="Ej: Un libro gigante, un mural, una exposición…"></textarea>
+        </div>
+      </div>
+
+      <div class="libre-section-title">🌈 Generar las 12 Situaciones de Aprendizaje</div>
+      <div class="libre-row" style="align-items:flex-end;">
+        <div class="libre-field">
+          <label class="libre-label">Temática principal del hilo <span style="font-weight:400;">(para generar títulos automáticos)</span></label>
+          <select class="libre-select" id="libre-tematica">
+            <option value="naturaleza">🌿 Naturaleza y medio ambiente</option>
+            <option value="emociones">💛 Emociones y bienestar</option>
+            <option value="cosmos">⭐ Cosmos y exploración</option>
+            <option value="mar">🌊 Mar y agua</option>
+            <option value="ciudad">🏙️ Ciudad y comunidad</option>
+            <option value="arte">🎨 Arte y creatividad</option>
+            <option value="viajes">🗺️ Viajes y culturas</option>
+            <option value="cuentos">📖 Cuentos y fantasía</option>
+            <option value="animales">🦋 Animales y ecosistemas</option>
+          </select>
+        </div>
+        <div class="libre-field" style="max-width:180px;">
+          <button class="libre-gen-btn" onclick="generarSugerenciasSA()">✨ Generar títulos</button>
+        </div>
+      </div>
+      <p style="font-size:11px;color:#94a3b8;margin:0 0 6px;">Los títulos se generan automáticamente. Edítalos hasta que sean tuyos ✍️</p>
+      <div class="libre-sas-grid" id="libre-sas-grid">
+        <!-- Se rellena con generarSugerenciasSA() o manualmente -->
+      </div>
+      <button class="libre-apply-btn" onclick="aplicarHiloPersonalizado()">✅ Aplicar mi hilo conductor</button>
+    </div>
+
     <div style="display:flex;gap:10px;margin-top:8px;">
       <button class="config-close-btn" onclick="toggleConfig()" style="flex:1;">✕ Cerrar configuración</button>
       <button class="config-close-btn" onclick="generarPDF()" id="btn-pdf"
@@ -8101,6 +8234,23 @@ function toggleConfig() {
 function filterHilos() {
   const tipo = document.getElementById('sel-tipo').value;
   const sel = document.getElementById('sel-hilo');
+  const hiloField = sel.closest('.config-field');
+  const libreForm = document.getElementById('libre-form');
+  const hiloCard  = document.getElementById('hilo-card');
+
+  if (tipo === 'personalizado') {
+    hiloField.style.display = 'none';
+    hiloCard.hidden = true;
+    libreForm.classList.add('visible');
+    // Pre-rellenar el grid si está vacío
+    if (!document.getElementById('libre-sas-grid').children.length) {
+      generarSugerenciasSA();
+    }
+    return;
+  }
+
+  hiloField.style.display = '';
+  libreForm.classList.remove('visible');
   const hilos = HILOS[tipo] || [];
   sel.innerHTML = hilos.map(h => `<option value="${h.id}">${h.emoji} ${h.nombre} — ${h.subtitulo}</option>`).join('');
   showHiloCard();
@@ -8205,6 +8355,207 @@ function updateResumenHiloInfo(h) {
     if (intro) intro.appendChild(hiloInfo);
   }
   hiloInfo.innerHTML = '<strong>' + h.emoji + ' Hilo conductor activo: ' + h.nombre + '</strong> — ' + h.subtitulo + '<br><em style="font-size:11px;color:var(--muted);">' + h.descripcion + '</em>';
+}
+
+// ── Hilo personalizado ──────────────────────────────────────────────────────
+
+var PLANTILLAS_SA = {
+  naturaleza: [
+    ["[M] y el bosque que estaba enfermo", "ODS 15"],
+    ["[M] y la lluvia que no llegó", "ODS 6"],
+    ["[M] en la granja sin alimento", "ODS 2"],
+    ["[M] y la gran tormenta", "ODS 13"],
+    ["[M] y el pueblo sin luz", "ODS 7"],
+    ["[M] y las semillas valientes", "ODS 15"],
+    ["[M] en el río que lloraba", "ODS 6"],
+    ["[M] y los niños que cuidan la tierra", "ODS 2"],
+    ["[M] en la montaña de hielo", "ODS 13"],
+    ["[M] y el jardín de todos", "ODS 11"],
+    ["[M] y las flores del mundo", "ODS 5"],
+    ["[M] planta el último árbol", "ODS 17"]
+  ],
+  emociones: [
+    ["[M] y la tristeza que se perdió", "ODS 3"],
+    ["[M] aprende a pedir ayuda", "ODS 3"],
+    ["[M] y el miedo al cole nuevo", "ODS 4"],
+    ["[M] y los colores de las emociones", "ODS 10"],
+    ["[M] en el barrio donde nadie se conoce", "ODS 11"],
+    ["[M] y la niña que no hablaba", "ODS 4"],
+    ["[M] aprende que los errores enseñan", "ODS 4"],
+    ["[M] y la familia diferente", "ODS 10"],
+    ["[M] cuida a quien lo necesita", "ODS 3"],
+    ["[M] y la rabia que creció", "ODS 16"],
+    ["[M] y el abrazo que llegó tarde", "ODS 5"],
+    ["[M] y el gran compromiso", "ODS 17"]
+  ],
+  cosmos: [
+    ["[M] y la estrella que se apagó", "ODS 13"],
+    ["[M] en el planeta sin agua", "ODS 6"],
+    ["[M] y la luna hambrienta", "ODS 2"],
+    ["[M] y el cohete que no podía volar", "ODS 7"],
+    ["[M] en el mundo donde todos son iguales", "ODS 10"],
+    ["[M] y la tormenta de cometas", "ODS 13"],
+    ["[M] en la ciudad flotante", "ODS 11"],
+    ["[M] y los niños del otro planeta", "ODS 4"],
+    ["[M] y el mar de estrellas", "ODS 14"],
+    ["[M] en el bosque de luz", "ODS 15"],
+    ["[M] y la exploradoras del cosmos", "ODS 5"],
+    ["[M] vuelve a casa", "ODS 17"]
+  ],
+  mar: [
+    ["[M] y la playa llena de plástico", "ODS 14"],
+    ["[M] en el arrecife que desapareció", "ODS 14"],
+    ["[M] y el río que llegaba al mar", "ODS 6"],
+    ["[M] y la ballena perdida", "ODS 14"],
+    ["[M] en la isla sin agua dulce", "ODS 6"],
+    ["[M] y la tormenta en el mar", "ODS 13"],
+    ["[M] y los pescadores del mundo", "ODS 2"],
+    ["[M] en el puerto de todos", "ODS 10"],
+    ["[M] y las niñas marineras", "ODS 5"],
+    ["[M] y el fondo marino que brillaba", "ODS 15"],
+    ["[M] y la aldea costera", "ODS 1"],
+    ["[M] cuida el océano", "ODS 17"]
+  ],
+  ciudad: [
+    ["[M] y el barrio sin parque", "ODS 11"],
+    ["[M] y la escuela de todos", "ODS 4"],
+    ["[M] en el mercado del mundo", "ODS 12"],
+    ["[M] y el autobús que no llegaba", "ODS 11"],
+    ["[M] y la basura que nadie recogía", "ODS 12"],
+    ["[M] en la calle sin árboles", "ODS 15"],
+    ["[M] y el edificio que no tenía luz", "ODS 7"],
+    ["[M] y los vecinos del barrio", "ODS 10"],
+    ["[M] en la plaza de la paz", "ODS 16"],
+    ["[M] y la niña que recién llegó", "ODS 10"],
+    ["[M] y las mujeres que construyen", "ODS 5"],
+    ["[M] y el sueño de la ciudad ideal", "ODS 17"]
+  ],
+  arte: [
+    ["[M] y el cuadro que no tenía color", "ODS 10"],
+    ["[M] en el museo sin puertas", "ODS 11"],
+    ["[M] y la canción que viajó al mundo", "ODS 4"],
+    ["[M] y el teatro del barrio", "ODS 11"],
+    ["[M] y los instrumentos olvidados", "ODS 10"],
+    ["[M] y la danza de los colores", "ODS 5"],
+    ["[M] en el taller de reciclaje creativo", "ODS 12"],
+    ["[M] y los cuentos de todas las culturas", "ODS 10"],
+    ["[M] y el mural del mundo", "ODS 13"],
+    ["[M] y la biblioteca que soñaba", "ODS 16"],
+    ["[M] y la artista sin materiales", "ODS 1"],
+    ["[M] crea para todos", "ODS 17"]
+  ],
+  viajes: [
+    ["[M] viaja al bosque amazónico", "ODS 15"],
+    ["[M] en el desierto de África", "ODS 2"],
+    ["[M] y los mares del mundo", "ODS 14"],
+    ["[M] en la ciudad más alta del mundo", "ODS 11"],
+    ["[M] explora su barrio", "ODS 10"],
+    ["[M] y un río en peligro", "ODS 6"],
+    ["[M] en la aldea sin luz", "ODS 7"],
+    ["[M] y los niños del mundo van al cole", "ODS 4"],
+    ["[M] y el mercado del mundo", "ODS 12"],
+    ["[M] y el planeta que se calienta", "ODS 13"],
+    ["[M] y las exploradoras del mundo", "ODS 5"],
+    ["[M] y el compromiso global", "ODS 17"]
+  ],
+  cuentos: [
+    ["[M] y el cuento del agua que se fue", "ODS 6"],
+    ["[M] y el árbol que quería crecer", "ODS 15"],
+    ["[M] y la niña que no podía ir al cole", "ODS 4"],
+    ["[M] en el mercado de los deseos", "ODS 2"],
+    ["[M] y el dragón que escupía humo", "ODS 13"],
+    ["[M] en el barco de los colores", "ODS 10"],
+    ["[M] y la princesa sin corona", "ODS 5"],
+    ["[M] en el pueblo sin luz", "ODS 7"],
+    ["[M] y el monstruo de la basura", "ODS 12"],
+    ["[M] en la ciudad que no dormía", "ODS 11"],
+    ["[M] y el gigante bueno", "ODS 16"],
+    ["[M] escribe el cuento del mundo", "ODS 17"]
+  ],
+  animales: [
+    ["[M] y el oso polar sin hielo", "ODS 13"],
+    ["[M] y el elefante del bosque seco", "ODS 15"],
+    ["[M] y la tortuga del mar de plástico", "ODS 14"],
+    ["[M] y las abejas que desaparecieron", "ODS 15"],
+    ["[M] y el pez que no encontraba agua limpia", "ODS 6"],
+    ["[M] y el lobo del bosque talado", "ODS 15"],
+    ["[M] y la manada sin alimento", "ODS 2"],
+    ["[M] en la granja de todos", "ODS 2"],
+    ["[M] y el pájaro del barrio", "ODS 11"],
+    ["[M] y la mariposa que buscaba flores", "ODS 15"],
+    ["[M] y los animales que viajan solos", "ODS 13"],
+    ["[M] y el gran refugio animal", "ODS 17"]
+  ]
+};
+
+var ODS_LISTA = [
+  "ODS 1","ODS 2","ODS 3","ODS 4","ODS 5","ODS 6","ODS 7","ODS 8",
+  "ODS 9","ODS 10","ODS 11","ODS 12","ODS 13","ODS 14","ODS 15","ODS 16","ODS 17"
+];
+
+function generarSugerenciasSA() {
+  var nombre = (document.getElementById('libre-nombre').value || '').trim().toUpperCase() || 'MI MASCOTA';
+  var tematica = document.getElementById('libre-tematica').value;
+  var plantillas = PLANTILLAS_SA[tematica] || PLANTILLAS_SA.naturaleza;
+  var grid = document.getElementById('libre-sas-grid');
+
+  grid.innerHTML = plantillas.map(function(p, i) {
+    var titulo = p[0].replace('[M]', nombre);
+    var ods = p[1];
+    var odsOptions = ODS_LISTA.map(function(o) {
+      return '<option value="' + o + '"' + (o === ods ? ' selected' : '') + '>' + o + '</option>';
+    }).join('');
+    return '<div class="libre-sa-row">' +
+      '<span class="libre-sa-num">SA' + (i+1) + '</span>' +
+      '<input type="text" class="libre-sa-titulo" id="libre-sa-' + i + '" value="' + titulo + '">' +
+      '<select class="libre-sa-ods" id="libre-ods-' + i + '">' + odsOptions + '</select>' +
+    '</div>';
+  }).join('');
+}
+
+function aplicarHiloPersonalizado() {
+  var nombre    = (document.getElementById('libre-nombre').value || '').trim().toUpperCase() || 'MI HILO';
+  var emoji     = (document.getElementById('libre-emoji').value || '🌟').trim();
+  var subtitulo = (document.getElementById('libre-subtitulo').value || '').trim() || 'Hilo conductor personalizado';
+  var desc      = (document.getElementById('libre-descripcion').value || '').trim() || subtitulo;
+  var mecanica  = (document.getElementById('libre-mecanica').value || '').trim() || 'La docente introduce cada Situación de Aprendizaje a través del hilo conductor.';
+  var producto  = (document.getElementById('libre-producto').value || '').trim() || 'Producto final elaborado a lo largo del curso.';
+
+  var sas = [];
+  var grid = document.getElementById('libre-sas-grid');
+  if (!grid.children.length) { generarSugerenciasSA(); }
+  for (var i = 0; i < 12; i++) {
+    var tEl = document.getElementById('libre-sa-' + i);
+    var oEl = document.getElementById('libre-ods-' + i);
+    var t = tEl ? tEl.value : ('SA ' + (i+1));
+    var o = oEl ? oEl.value : 'ODS 17';
+    sas.push([t, o]);
+  }
+
+  var h = {
+    id: 'personalizado',
+    nombre: nombre,
+    subtitulo: subtitulo,
+    emoji: emoji,
+    areas: 'CA · DEE · CRR',
+    descripcion: desc,
+    mecanica: mecanica,
+    producto_final: producto,
+    sas: sas
+  };
+
+  applyHiloToUDs(h);
+  updateResumenHiloInfo(h);
+  updateHeaderSub();
+
+  // Feedback
+  var btn = event.currentTarget;
+  btn.textContent = '✅ ¡Hilo aplicado!';
+  btn.style.background = '#166534';
+  setTimeout(function() {
+    btn.textContent = '✅ Aplicar mi hilo conductor';
+    btn.style.background = '';
+  }, 3000);
 }
 
 function updateContexto() {
