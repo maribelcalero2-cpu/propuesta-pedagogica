@@ -9006,10 +9006,7 @@ function generarWord() {
       if (indBl) {
         lines.push(rp('RÚBRICA DE EVALUACIÓN DEL ALUMNADO — SA ' + (n+1), 'h2'));
         lines.push(rp('Instrumento: Rúbrica de observación sistemática', 'normal'));
-        var rubFilas = [['Indicador de Logro', 'Inicio (1)
-No lo hace de forma autónoma', 'En proceso (2)
-Lo hace con apoyo', 'Logrado (3)
-Lo hace de forma autónoma', 'Evidencia / Observaciones']];
+        var rubFilas = [['Indicador de Logro', 'Inicio (1)\nNo lo hace de forma autónoma', 'En proceso (2)\nLo hace con apoyo', 'Logrado (3)\nLo hace de forma autónoma', 'Evidencia / Observaciones']];
         indBl.querySelectorAll('li').forEach(function(liInd) {
           var indText = (liInd.textContent||'').replace(/\s+/g,' ').trim();
           if (indText.length > 3) rubFilas.push([indText, '', '', '', '']);
