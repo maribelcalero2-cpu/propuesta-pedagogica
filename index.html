@@ -704,9 +704,9 @@ body {
 
     <div style="display:flex;gap:10px;margin-top:8px;">
       <button class="config-close-btn" onclick="toggleConfig()" style="flex:1;">✕ Cerrar configuración</button>
-      <button class="config-close-btn" onclick="generarPDF()" id="btn-pdf"
+      <button class="config-close-btn" onclick="generarWord()" id="btn-word"
         style="flex:1;background:#0f766e;color:#fff;border-color:#0f766e;">
-        📄 Descargar PDF
+        📄 Descargar Word
       </button>
     </div>
   </div>
@@ -8687,6 +8687,330 @@ try {
   const t = localStorage.getItem('theme');
   if(t) document.documentElement.setAttribute('data-theme', t);
 } catch(e){}
+
+// ── Generador de Word (docx.js, client-side) ────────────────────────────────
+function generarWord() {
+  var btn = document.getElementById('btn-word');
+  btn.textContent = '⏳ Generando…';
+  btn.disabled = true;
+
+  function cargarScript(src, cb) {
+    if (document.querySelector('script[src="' + src + '"]')) { cb(); return; }
+    var s = document.createElement('script');
+    s.src = src;
+    s.onload = cb;
+    s.onerror = function() {
+      alert('Error cargando librería. Revisa tu conexión a internet.');
+      btn.textContent = '📄 Descargar Word'; btn.disabled = false;
+    };
+    document.head.appendChild(s);
+  }
+
+  function hacerDoc() {
+    var D = window.docx;
+    if (!D) { alert('La librería docx.js no está disponible.'); btn.textContent = '📄 Descargar Word'; btn.disabled = false; return; }
+
+    // ── Datos de configuración ───────────────────────────────────────────────
+    var centro   = (document.getElementById('inp-centro').value || 'Centro educativo').trim();
+    var nivelEl  = document.getElementById('sel-nivel');
+    var nivel    = nivelEl.options[nivelEl.selectedIndex].text;
+    var hiloInfo = document.getElementById('resumen-hilo-info');
+    var hiloTxt  = hiloInfo ? hiloInfo.textContent.replace('Hilo conductor activo:', '').trim() : 'Hilo conductor';
+
+    // ── Helpers ──────────────────────────────────────────────────────────────
+    function limpia(t) {
+      return (t || '').replace(/[^ -ÿÀ-ɏ]/g, '').replace(/\s+/g, ' ').trim();
+    }
+
+    var VERDE = '4d6b55';
+    var VERDE_CLR = [77, 107, 85];
+    var FONT = 'Arial';
+
+    function mkPara(texto, opts) {
+      opts = opts || {};
+      var runs = [];
+      if (opts.bold || opts.italic || opts.size || opts.color) {
+        runs.push(new D.TextRun({ text: limpia(texto), bold: !!opts.bold, italics: !!opts.italic, size: opts.size || 22, color: opts.color || '000000', font: FONT }));
+      } else {
+        runs.push(new D.TextRun({ text: limpia(texto), size: 22, font: FONT }));
+      }
+      return new D.Paragraph({
+        children: runs,
+        alignment: opts.align || D.AlignmentType.JUSTIFIED,
+        spacing: { before: opts.before || 0, after: opts.after || 100 },
+        pageBreakBefore: !!opts.pageBreak
+      });
+    }
+
+    function mkH1(txt, pgBreak) {
+      return new D.Paragraph({
+        children: [new D.TextRun({ text: limpia(txt), bold: true, size: 28, color: VERDE, font: FONT })],
+        heading: D.HeadingLevel.HEADING_1,
+        spacing: { before: 320, after: 160 },
+        pageBreakBefore: pgBreak !== false
+      });
+    }
+
+    function mkH2(txt) {
+      return new D.Paragraph({
+        children: [new D.TextRun({ text: limpia(txt), bold: true, size: 24, color: '3a4f42', font: FONT })],
+        heading: D.HeadingLevel.HEADING_2,
+        spacing: { before: 200, after: 100 }
+      });
+    }
+
+    function mkH3(txt) {
+      return new D.Paragraph({
+        children: [new D.TextRun({ text: limpia(txt), bold: true, size: 22, color: '5a7a62', font: FONT })],
+        heading: D.HeadingLevel.HEADING_3,
+        spacing: { before: 140, after: 80 }
+      });
+    }
+
+    function mkBullet(txt) {
+      return new D.Paragraph({
+        children: [new D.TextRun({ text: limpia(txt), size: 20, font: FONT })],
+        bullet: { level: 0 },
+        spacing: { after: 60 }
+      });
+    }
+
+    function mkTabla(filas) {
+      if (!filas || !filas.length) return null;
+      var nCols = filas[0].length;
+      var colW  = Math.floor(8640 / nCols);
+      var rows  = filas.map(function(fila, ri) {
+        var cells = fila.map(function(txt) {
+          var isHdr = ri === 0;
+          return new D.TableCell({
+            children: [new D.Paragraph({
+              children: [new D.TextRun({
+                text: limpia(String(txt || '')),
+                bold: isHdr, size: isHdr ? 20 : 19,
+                color: isHdr ? 'FFFFFF' : '1a1a1a',
+                font: FONT
+              })],
+              spacing: { after: 40 }
+            })],
+            shading: isHdr
+              ? { fill: VERDE, color: VERDE }
+              : (ri % 2 === 0 ? { fill: 'FFFFFF' } : { fill: 'f2f5f2' }),
+            width: { size: colW, type: D.WidthType.DXA },
+            margins: { top: 50, bottom: 50, left: 80, right: 80 }
+          });
+        });
+        return new D.TableRow({ children: cells, tableHeader: ri === 0 });
+      });
+      return new D.Table({
+        rows: rows,
+        width: { size: 8640, type: D.WidthType.DXA },
+        layout: D.TableLayoutType.FIXED
+      });
+    }
+
+    function espaciado() {
+      return new D.Paragraph({ children: [new D.TextRun('')], spacing: { after: 120 } });
+    }
+
+    function extraerBloque(el) {
+      var items = [];
+      el.querySelectorAll('p').forEach(function(p) {
+        var t = limpia(p.textContent);
+        if (t.length > 5) items.push(mkPara(t));
+      });
+      el.querySelectorAll('li').forEach(function(li) {
+        var t = limpia(li.textContent);
+        if (t.length > 2) items.push(mkBullet(t));
+      });
+      el.querySelectorAll('table').forEach(function(tbl) {
+        var filas = [];
+        var thead = tbl.querySelector('thead');
+        if (thead) {
+          var hdrs = [];
+          thead.querySelectorAll('th').forEach(function(th) { hdrs.push(limpia(th.textContent)); });
+          if (hdrs.length) filas.push(hdrs);
+        }
+        tbl.querySelectorAll('tbody tr, tr').forEach(function(tr, ri) {
+          if (ri === 0 && thead) return;
+          var fila = [];
+          tr.querySelectorAll('td,th').forEach(function(c) { fila.push(limpia(c.textContent)); });
+          if (fila.length && fila.some(function(c) { return c.length > 0; })) filas.push(fila);
+        });
+        if (filas.length) {
+          var t = mkTabla(filas);
+          if (t) { items.push(espaciado()); items.push(t); items.push(espaciado()); }
+        }
+      });
+      return items;
+    }
+
+    // ── Construcción del documento ───────────────────────────────────────────
+    var ch = [];
+
+    // — Portada ——————————————————————————————————————————————————————————————
+    ch.push(mkPara('PROPUESTA PEDAGÓGICA ANUAL', { bold: true, size: 44, color: VERDE, align: D.AlignmentType.CENTER, before: 1440, after: 400 }));
+    ch.push(mkPara('Educación Infantil · 2.º Ciclo · Curso 2026-2027', { size: 28, color: '555555', align: D.AlignmentType.CENTER, after: 280 }));
+    ch.push(mkPara(centro, { bold: true, size: 32, color: '222222', align: D.AlignmentType.CENTER, after: 200 }));
+    ch.push(mkPara(nivel, { size: 26, color: '666666', align: D.AlignmentType.CENTER, after: 200 }));
+    ch.push(mkPara('Hilo conductor: ' + hiloTxt, { size: 24, italic: true, color: '7b9e87', align: D.AlignmentType.CENTER, after: 2880 }));
+    ch.push(mkPara('Generado con Generador PDA EI Andalucía — Curso 2026-2027', { size: 16, color: 'aaaaaa', align: D.AlignmentType.CENTER }));
+
+    // — Parte I: Aspectos Generales ——————————————————————————————————————————
+    var ATIT = [
+      '0. CONTEXTO DEL AULA',
+      '1. MARCO LEGAL',
+      '2. OBJETIVOS GENERALES DE LA ETAPA',
+      '3. PRINCIPIOS PEDAGÓGICOS',
+      '4. DUA — DISEÑO UNIVERSAL PARA EL APRENDIZAJE',
+      '5. ATENCIÓN A LA DIVERSIDAD E INCLUSIÓN',
+      '6. TEMPORIZACIÓN GLOBAL — 12 SITUACIONES DE APRENDIZAJE',
+      '7. EVALUACIÓN — CRITERIOS, HERRAMIENTAS E INSTRUMENTOS',
+      '8. ACTIVIDADES COMPLEMENTARIAS',
+      '9. PROPUESTA PEDAGÓGICA — METODOLOGÍA Y CICLO DE KOLB',
+      '10. ORGANIZACIÓN DEL EQUIPO DE CICLO',
+      '11. EVALUACIÓN INICIAL — CONCRECIÓN ANUAL',
+      '12. SEGUIMIENTO DE LA PROGRAMACIÓN DIDÁCTICA',
+      '13. MATERIALES Y RECURSOS DIDÁCTICOS',
+      '14. PLANES Y PROGRAMAS DEL CENTRO'
+    ];
+
+    var abloques = Array.from(document.querySelectorAll('#vista-aspectos .bloque'));
+    abloques.forEach(function(bl, idx) {
+      var tit = ATIT[idx] || limpia((bl.querySelector('.bloque-title') || {}).textContent || ('Sección ' + idx));
+      ch.push(mkH1(tit, true));
+      extraerBloque(bl).forEach(function(it) { ch.push(it); });
+    });
+
+    // — Parte II: 12 Situaciones de Aprendizaje ——————————————————————————————
+    for (var n = 0; n < 12; n++) {
+      var sec = document.getElementById('ud' + n);
+      if (!sec) continue;
+
+      var get = function(sel, fallback) {
+        var el = sec.querySelector(sel);
+        return el ? limpia(el.textContent) : (fallback || '');
+      };
+
+      var saNombre  = get('[data-hilo="sda-nombre"]', 'SA ' + (n + 1));
+      var saMes     = get('.ud-mes', '');
+      var saOds     = get('[data-hilo="ods"]', '');
+      var saPreg    = get('[data-hilo="sda-pregunta"]', '');
+      var saProducto = get('[data-hilo="sda-producto"]', '');
+      var saAreas   = get('.ud-meta', '');
+
+      ch.push(mkH1('SA ' + (n + 1) + ' — ' + saNombre, true));
+
+      // Tabla-resumen de la SdA
+      var infoTabla = mkTabla([
+        ['Campo', 'Valor'],
+        ['Año académico', '2026/2027'],
+        ['Título de la SdA', saNombre],
+        ['Pregunta / Reto generador', saPreg],
+        ['Producto final', saProducto],
+        ['Temporalización', saMes],
+        ['ODS vinculado', saOds]
+      ]);
+      if (infoTabla) { ch.push(infoTabla); ch.push(espaciado()); }
+
+      // Bloques internos de la SdA (justificación, curricular, Kolb, evaluación…)
+      var bloques = Array.from(sec.querySelectorAll('.bloque'));
+      bloques.forEach(function(bl) {
+        var titBl = bl.querySelector('.bloque-title');
+        if (titBl) ch.push(mkH2(limpia(titBl.textContent)));
+        // Subtítulos internos (h4)
+        var procesados = new Set();
+        bl.querySelectorAll('h4, .curr-h4').forEach(function(h4) {
+          ch.push(mkH3(limpia(h4.textContent)));
+          procesados.add(h4);
+        });
+        // Párrafos directos del bloque (no dentro de tablas)
+        bl.querySelectorAll('p').forEach(function(p) {
+          if (p.closest('table')) return;
+          var t = limpia(p.textContent);
+          if (t.length > 5) ch.push(mkPara(t));
+        });
+        // Listas
+        bl.querySelectorAll('li').forEach(function(li) {
+          var t = limpia(li.textContent);
+          if (t.length > 2) ch.push(mkBullet(t));
+        });
+        // Tablas
+        bl.querySelectorAll('table').forEach(function(tbl) {
+          var filas = [];
+          var thead = tbl.querySelector('thead');
+          if (thead) {
+            var hdrs = [];
+            thead.querySelectorAll('th').forEach(function(th) { hdrs.push(limpia(th.textContent)); });
+            if (hdrs.length) filas.push(hdrs);
+          }
+          tbl.querySelectorAll('tbody tr, tr').forEach(function(tr, ri) {
+            if (ri === 0 && thead) return;
+            var fila = [];
+            tr.querySelectorAll('td,th').forEach(function(c) { fila.push(limpia(c.textContent)); });
+            if (fila.length && fila.some(function(c) { return c.length > 0; })) filas.push(fila);
+          });
+          if (filas.length) {
+            var t = mkTabla(filas);
+            if (t) { ch.push(espaciado()); ch.push(t); ch.push(espaciado()); }
+          }
+        });
+      });
+    }
+
+    // — Generar y descargar ——————————————————————————————————————————————————
+    var doc = new D.Document({
+      creator: 'Generador PDA EI Andalucía',
+      title: 'Propuesta Pedagógica Anual EI 2026-2027',
+      description: centro + ' · ' + nivel,
+      styles: {
+        default: {
+          document: { run: { font: FONT, size: 22 }, paragraph: { spacing: { after: 100 } } }
+        }
+      },
+      sections: [{
+        properties: {
+          page: { margin: { top: 1000, right: 900, bottom: 1000, left: 1000, header: 600, footer: 600 } }
+        },
+        headers: {
+          default: new D.Header({
+            children: [new D.Paragraph({
+              children: [
+                new D.TextRun({ text: 'Propuesta Pedagógica · ' + centro + ' · ' + nivel, size: 16, color: '888888', font: FONT }),
+                new D.TextRun({ children: [new D.Tab()], font: FONT }),
+                new D.TextRun({ children: [new D.PageNumber(D.NumberFormat.DECIMAL)], size: 16, color: '888888', font: FONT })
+              ],
+              tabStops: [{ type: D.TabStopType.RIGHT, position: 8640 }],
+              border: { bottom: { style: D.BorderStyle.SINGLE, size: 1, color: 'cccccc' } }
+            })]
+          })
+        },
+        children: ch
+      }]
+    });
+
+    D.Packer.toBlob(doc).then(function(blob) {
+      var url = URL.createObjectURL(blob);
+      var a   = document.createElement('a');
+      a.href  = url;
+      a.download = 'Propuesta_Pedagogica_EI_2026-27_' + centro.replace(/\s+/g,'-').replace(/[^a-zA-Z0-9\-]/g,'') + '.docx';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(function() { URL.revokeObjectURL(url); }, 1000);
+      btn.textContent = '✅ ¡Word descargado!';
+      btn.disabled = false;
+      setTimeout(function() { btn.textContent = '📄 Descargar Word'; }, 4000);
+    }).catch(function(err) {
+      console.error(err);
+      alert('Error generando el documento: ' + err.message);
+      btn.textContent = '📄 Descargar Word'; btn.disabled = false;
+    });
+  }
+
+  cargarScript('https://cdn.jsdelivr.net/npm/docx@7.8.2/build/index.umd.js', function() {
+    setTimeout(hacerDoc, 150);
+  });
+}
 
 // ── Generador de PDF (jsPDF, Times New Roman 12pt, sin comprimir) ─────────
 function generarPDF() {
