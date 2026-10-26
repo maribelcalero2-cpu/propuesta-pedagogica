@@ -8726,7 +8726,8 @@ function generarWord() {
         else if (n === 123) { out += B + O; }
         else if (n === 125) { out += B + C; }
         else if (n < 128)  { out += s[i]; }
-        else { out += B + 'u' + n + '?'; }
+        else if (n < 256)  { out += B + "'" + n.toString(16).padStart(2,'0'); }
+        else { out += B + 'u' + n + B + "'" + (n & 0xFF).toString(16).padStart(2,'0'); }
       }
       return out;
     }
@@ -8806,7 +8807,7 @@ function generarWord() {
     // ── Construcción del RTF ─────────────────────────────────────────────────
     var lines = [];
     // Cabecera RTF
-    lines.push(O+B+'rtf1'+B+'ansi'+B+'deff0');
+    lines.push(O+B+'rtf1'+B+'ansi'+B+'ansicpg1252'+B+'uc1'+B+'deff0');
     lines.push(O+B+'fonttbl'+O+B+'f0'+B+'fswiss'+B+'fcharset0 Arial;'+C+C);
     lines.push(O+B+'colortbl;'+
       B+'red77'+B+'green107'+B+'blue85;'+     // 1 verde oscuro (header)
