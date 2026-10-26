@@ -220,7 +220,7 @@ body {
   display: flex; gap: 6px; flex-wrap: wrap;
   padding: 10px max(16px, env(safe-area-inset-left,0px));
   background: var(--card); border-bottom: 1px solid var(--border);
-  position: sticky; top: var(--header-h); z-index: 90;
+  position: sticky; top: calc(var(--header-h) + var(--config-h,0px)); z-index: 90;
 }
 .nav-btn {
   display: flex; flex-direction: column; align-items: center;
@@ -8304,6 +8304,11 @@ function toggleConfig() {
   if (!p.hidden) {
     filterHilos();
     showHiloCard();
+    requestAnimationFrame(function() {
+      document.documentElement.style.setProperty('--config-h', p.offsetHeight + 'px');
+    });
+  } else {
+    document.documentElement.style.setProperty('--config-h', '0px');
   }
 }
 
