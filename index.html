@@ -1,6 +1,18 @@
 <title>PDA EI · Andalucía 2026-27</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Lato:wght@400;700&display=swap">
+<script>
+(function(){
+  var s=document.createElement('script');
+  s.src='https://unpkg.com/docx@7.8.2/build/index.umd.js';
+  s.onerror=function(){
+    var s2=document.createElement('script');
+    s2.src='https://cdn.jsdelivr.net/npm/docx@7.8.2/build/index.umd.js';
+    document.head.appendChild(s2);
+  };
+  document.head.appendChild(s);
+})();
+</script>
 <style>
 /* ── Variables + temas ── */
 :root {
@@ -8696,21 +8708,20 @@ function generarWord() {
   btn.textContent = '⏳ Generando…';
   btn.disabled = true;
 
-  function cargarScript(src, cb) {
-    if (document.querySelector('script[src="' + src + '"]')) { cb(); return; }
-    var s = document.createElement('script');
-    s.src = src;
-    s.onload = cb;
-    s.onerror = function() {
-      alert('Error cargando librería. Revisa tu conexión a internet.');
-      btn.textContent = '📄 Descargar Word'; btn.disabled = false;
-    };
-    document.head.appendChild(s);
-  }
-
   function hacerDoc() {
     var D = window.docx;
-    if (!D) { alert('La librería docx.js no está disponible.'); btn.textContent = '📄 Descargar Word'; btn.disabled = false; return; }
+    if (!D) {
+      // Último intento de carga si no llegó aún
+      var s = document.createElement('script');
+      s.src = 'https://unpkg.com/docx@7.8.2/build/index.umd.js';
+      s.onload = function() { setTimeout(hacerDoc, 200); };
+      s.onerror = function() {
+        alert('No se pudo cargar la librería Word. Comprueba la conexión e inténtalo de nuevo.');
+        btn.textContent = '📄 Descargar Word'; btn.disabled = false;
+      };
+      document.head.appendChild(s);
+      return;
+    }
 
     // ── Datos de configuración ───────────────────────────────────────────────
     var centro   = (document.getElementById('inp-centro').value || 'Centro educativo').trim();
@@ -9010,9 +9021,12 @@ function generarWord() {
     });
   }
 
-  cargarScript('https://cdn.jsdelivr.net/npm/docx@7.8.2/build/index.umd.js', function() {
-    setTimeout(hacerDoc, 150);
-  });
+  // Si ya está cargada, usar directamente; si no, esperar un tick
+  if (window.docx) {
+    hacerDoc();
+  } else {
+    setTimeout(hacerDoc, 300);
+  }
 }
 
 // ── Generador de PDF (jsPDF, Times New Roman 12pt, sin comprimir) ─────────
