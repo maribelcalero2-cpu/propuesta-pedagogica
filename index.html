@@ -8763,8 +8763,7 @@ function generarWord() {
           if (isHdr) out += O+B+'pard'+B+'intbl'+B+'b'+B+'fs20'+B+'cf6'+B+'qc '+e+B+'cell'+C;
           else        out += O+B+'pard'+B+'intbl'+B+'fs20 '+e+B+'cell'+C;
         });
-        out += B+'row
-';
+        out += B+'row\n';
       });
       return out;
     }
@@ -8892,8 +8891,7 @@ function generarWord() {
     lines.push(C); // cierre grupo RTF raíz
 
     // — Generar y descargar ——————————————————————————————————————————————————
-    var rtfContent = lines.join('
-');
+    var rtfContent = lines.join('\n');
     var blob = new Blob([rtfContent], {type: 'application/rtf'});
     var url  = URL.createObjectURL(blob);
     var a    = document.createElement('a');
