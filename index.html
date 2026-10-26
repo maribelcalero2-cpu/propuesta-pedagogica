@@ -8908,11 +8908,13 @@ function generarWord() {
     setTimeout(function() { btn.textContent = '📄 Descargar Word'; }, 4000);
   }
 
-  try { hacerDoc(); }
-  catch(err) {
-    console.error(err);
-    alert('Error generando el documento: ' + err.message);
-    btn.textContent = '📄 Descargar Word'; btn.disabled = false;
+  try {
+    hacerDoc();
+  } catch(err) {
+    console.error('RTF error:', err);
+    btn.textContent = '⚠️ Error (ver consola)';
+    btn.disabled = false;
+    setTimeout(function() { btn.textContent = '📄 Descargar Word'; }, 3000);
   }
 }
 
